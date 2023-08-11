@@ -35,7 +35,7 @@ fi
 setup_vendor "$DEVICE_COMMON" "$VENDOR" "$CM_ROOT" "true" "$1"
 
 # Copyright headers and guards
-write_headers "chuwi_vi10plus cube_iwork8ultimate"
+write_headers "chuwi_vi10plus cube_iwork8ultimate xiaomi_latte"
 
 # The standard common blobs
 write_makefiles "$MY_DIR"/proprietary-files.txt

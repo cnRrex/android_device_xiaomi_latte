@@ -20,15 +20,28 @@ DEVICE_PATH := device/xiaomi/latte
 # Platform
 TARGET_NO_BOOTLOADER := true
 
+# Prevent error building recovery
+# TARGET_NO_RECOVERY := true
+
+# FFMPEG
+BOARD_FFMPEG_32BIT_ONLY := true
+
 TARGET_BOARD_PLATFORM := gmin
 TARGET_BOARD_PLATFORM_GPU := intel_gen8
 TARGET_BOOTLOADER_BOARD_NAME := latte
 
-TARGET_ARCH := x86
+TARGET_ARCH := x86_64
 TARGET_ARCH_VARIANT := silvermont
-TARGET_CPU_ABI := x86
-TARGET_CPU_ABI_LIST := x86,armeabi-v7a,armeabi
+TARGET_CPU_ABI := x86_64
+
+TARGET_2ND_CPU_ABI := x86
+TARGET_2ND_ARCH := x86
+TARGET_2ND_ARCH_VARIANT := silvermont
+TARGET_2ND_CPU_VARIANT := silvermont
+
+TARGET_CPU_ABI_LIST := x86_64,x86,armeabi-v7a,armeabi,arm64-v8a
 TARGET_CPU_ABI_LIST_32_BIT := x86,armeabi-v7a,armeabi
+TARGET_CPU_ABI_LIST_64_BIT:= x86_64,arm64-v8a
 
 # Kernel
 BOARD_KERNEL_CMDLINE := loglevel=7 androidboot.hardware=latte firmware_class.path=/system/etc/firmware i915.fastboot=1 vga=current i915.modeset=1 drm.vblankoffdelay=1 bootboost=1 pm_suspend_debug=1 pstore.backend=ramoops thermal.off=1 androidboot.selinux=permissive 
@@ -38,6 +51,10 @@ INTEL_POWER_HAL_INTERACTIVE_GOV := true
 
 # Binder
 TARGET_USES_64_BIT_BINDER := true
+
+#Houdini64
+ENABLE_NATIVEBRIDGE_64BIT := true
+PRODUCT_PROPERTY_OVERRIDES += ro.dalvik.vm.isa.arm64=x86_64 ro.enable.native.bridge.exec64=1
 
 # CPUset
 ENABLE_CPUSETS := true

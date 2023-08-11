@@ -24,6 +24,7 @@ PRODUCT_AAPT_CONFIG := normal
 PRODUCT_CHARACTERISTICS := tablet
 PRODUCT_AAPT_PREF_CONFIG := hdpi
 
+
 # Audio
 PRODUCT_PACKAGES += \
     audio.a2dp.default \
@@ -56,7 +57,7 @@ PRODUCT_PACKAGES += \
 # Lights
 PRODUCT_PACKAGES += \
     lights.gmin
-
+    
 # Dalvik
 PRODUCT_PROPERTY_OVERRIDES += \
     dalvik.vm.heapstartsize=8m \
@@ -118,6 +119,10 @@ ADDITIONAL_DEFAULT_PROPERTIES += \
 # Ramdisk
 PRODUCT_COPY_FILES += \
     $(call find-copy-subdir-files,*,device/xiaomi/latte/ramdisk,root)
+
+PRODUCT_PROPERTY_OVERRIDES += \
+   ro.dalvik.vm.isa.arm64=x86_64 \
+   ro.enable.native.bridge.exec64=1
 
 # Media codecs
 PRODUCT_COPY_FILES += \

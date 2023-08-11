@@ -1,5 +1,34 @@
 Copyright 2017 - The LineageOS Project
 
+this branch need to edit some source file:
+
+In file: cm-13.0/system/core/libpixelflinger/codeflinger/x86/X86Assembler.h
+line 29:
+--- #include "enc_wrapper.h"
++++ #include "codeflinger/x86/libenc/enc_wrapper.h"
+
+In file: cm-13.0/bootable/recovery/updater/updater.c
+line 32:
+--- #include "register.inc"
++++ // #include "register.inc"
+line 104:
+--- RegisterDeviceExtensions();
++++ // RegisterDeviceExtensions();
+
+In file: cm-13.0/bootable/recovery/updater/Android.mk
+line 107:
+--- LOCAL_32_BIT_ONLY := true
++++ # LOCAL_32_BIT_ONLY := true
+
+You should apply these commit to build ffmpeg 32-bit only:
+cm-13.0/external/ffmpeg/:
+https://review.lineageos.org/c/LineageOS/android_external_ffmpeg/+/60259
+github:https://github.com/LineageOS/android_external_ffmpeg/commit/07d2a0ce8b14dcd688798410ef49eed60e2f9a1d
+
+cm-13.0/external/stagefright-plugins/:
+https://review.lineageos.org/c/LineageOS/android_external_stagefright-plugins/+/61448
+github:https://github.com/LineageOS/android_external_stagefright-plugins/commit/db45c0fb502f21307a9179ac79011d11323e72b3
+
 Android 6.x Device configuration for Xiaomi Mi Pad 2
 =====================================
 
