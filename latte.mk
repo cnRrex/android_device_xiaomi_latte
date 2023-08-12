@@ -17,6 +17,7 @@
 
 DEVICE_PACKAGE_OVERLAYS += device/xiaomi/latte/overlay
 
+$(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
 $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base.mk)
 $(call inherit-product, vendor/xiaomi/latte/latte-vendor.mk)
 
