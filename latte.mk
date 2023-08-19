@@ -58,6 +58,9 @@ PRODUCT_PACKAGES += \
 # Lights
 PRODUCT_PACKAGES += \
     lights.gmin
+
+# FM
+#
     
 # Dalvik
 PRODUCT_PROPERTY_OVERRIDES += \
@@ -87,7 +90,10 @@ PRODUCT_PACKAGES += \
 # Houdini
 ADDITIONAL_BUILD_PROPERTIES += \
     ro.dalvik.vm.isa.arm=x86 \
-    ro.enable.native.bridge.exec=1
+    ro.enable.native.bridge.exec=1\
+    ro.dalvik.vm.isa.arm64=x86_64 \
+    ro.enable.native.bridge.exec64=1
+
 
 ADDITIONAL_DEFAULT_PROPERTIES += \
     ro.dalvik.vm.native.bridge=libhoudini.so
@@ -120,10 +126,6 @@ ADDITIONAL_DEFAULT_PROPERTIES += \
 # Ramdisk
 PRODUCT_COPY_FILES += \
     $(call find-copy-subdir-files,*,device/xiaomi/latte/ramdisk,root)
-
-PRODUCT_PROPERTY_OVERRIDES += \
-   ro.dalvik.vm.isa.arm64=x86_64 \
-   ro.enable.native.bridge.exec64=1
 
 # Media codecs
 PRODUCT_COPY_FILES += \
