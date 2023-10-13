@@ -60,7 +60,8 @@ PRODUCT_PACKAGES += \
     lights.gmin
 
 # FM
-#
+# PRODUCT_PACKAGES += \
+#     FMRadio
     
 # Dalvik
 PRODUCT_PROPERTY_OVERRIDES += \

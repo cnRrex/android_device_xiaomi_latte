@@ -881,5 +881,5 @@ on property:persist.sys.display_ce=11
     write /sys/class/graphics/fb0/dispparam 0x10
 
 on init
-    export LD_SHIM_LIBS /system/lib/libparameter.so|libshim_audio.so:/system/lib/libpower-subsystem.so|libshim_audio.so:/system/lib/libremoteparameter-subsystem.so|libshim_audio.so:/system/lib/libtinyalsa_custom-subsystem.so|libshim_audio.so:/system/lib/hw/camera.gmin.so|libshim_camera.so:/system/lib/hw/sensors.gmin.so|libshim_sensors.so
+    export LD_SHIM_LIBS "/system/lib/libparameter.so|libshim_audio.so:/system/lib64/libparameter.so|libshim_audio.so:/system/lib/libpower-subsystem.so|libshim_audio.so:/system/lib64/libpower-subsystem.so|libshim_audio.so:/system/lib/libremoteparameter-subsystem.so|libshim_audio.so:/system/lib64/libremoteparameter-subsystem.so|libshim_audio.so:/system/lib/libtinyalsa_custom-subsystem.so|libshim_audio.so:/system/lib64/libtinyalsa_custom-subsystem.so|libshim_audio.so:/system/lib/hw/camera.gmin.so|libshim_camera.so:/system/lib/hw/sensors.gmin.so|libshim_sensors.so:/system/lib64/hw/sensors.gmin.so|libshim_sensors.so"
 

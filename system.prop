@@ -6,8 +6,8 @@ dalvik.vm.dex2oat-swap=false
 # ro.hwui.text_large_cache_width=2048
 # ro.hwui.text_large_cache_height=512
 ro.opengles.version=196609
-# ro.camera.rec.pixel_format=0x10F
-# ro.ycbcr.pixel_format=0x10F
+ro.camera.rec.pixel_format=0x10F
+ro.ycbcr.pixel_format=0x10F
 
 #
 # from device/xiaomi/latte/latte/system.prop

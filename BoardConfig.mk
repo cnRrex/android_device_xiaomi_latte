@@ -23,16 +23,17 @@ TARGET_NO_BOOTLOADER := true
 # Prevent error building recovery
 # TARGET_NO_RECOVERY := true
 
-# FFMPEG
+# FFMPEG: apply patch to avoid build error
 BOARD_FFMPEG_32BIT_ONLY := true
 
 TARGET_BOARD_PLATFORM := gmin
 TARGET_BOARD_PLATFORM_GPU := intel_gen8
 TARGET_BOOTLOADER_BOARD_NAME := latte
 
+TARGET_CPU_ABI := x86_64
 TARGET_ARCH := x86_64
 TARGET_ARCH_VARIANT := silvermont
-TARGET_CPU_ABI := x86_64
+TARGET_CPU_VARIANT := silvermont
 
 TARGET_2ND_CPU_ABI := x86
 TARGET_2ND_ARCH := x86
