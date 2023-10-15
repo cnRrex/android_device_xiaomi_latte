@@ -1,0 +1,103 @@
+From c03ebc07634f1e08b84510df8afe3fe130b04f3a Mon Sep 17 00:00:00 2001
+From: jgu21 <jinghui.gu@intel.com>
+Date: Thu, 2 Apr 2015 04:22:46 -0400
+Subject: [PATCH] framework: Enable houdini to Support the apps which put all
+ libs under assets dir.
+
+1. Many apps in PRC market put all arm native libs under assets/ dir in
+   their APK, instead of lib/ dir.
+   Since Lollipop, PakcageManager needs clear ABI info during app
+   installation.
+   If the ABI is not supported, houdini has not chance to involve in.
+   For above kind of apps, houdini will not be loaded to help arm libs.
+   To support such kind of apps, we have to enable houdini even without
+   clear ABI info only for PRC market
+
+2. Fix GTS case failure caused by above modification,
+   which enforce to set arm ABI for all pure java
+
+NOTE: Must merge together with https://android.intel.com/449223
+
+Change-Id: I020812790707fb6ec53fb70900ad75971d907bbb
+Tracked-On: https://jira01.devtools.intel.com/browse/OAM-12442
+Signed-off-by: jgu21 <jinghui.gu@intel.com>
+Signed-off-by: Zhou,KaiX K <kaix.k.zhou@intel.com>
+Reviewed-on: https://android.intel.com:443/449222
+---
+ core/jni/com_android_internal_os_Zygote.cpp | 50 ++++++++++++++++-----
+ 1 file changed, 39 insertions(+), 11 deletions(-)
+
+diff --git a/core/jni/com_android_internal_os_Zygote.cpp b/core/jni/com_android_internal_os_Zygote.cpp
+index b431a3f487f..cd23c64e06f 100644
+--- a/core/jni/com_android_internal_os_Zygote.cpp
++++ b/core/jni/com_android_internal_os_Zygote.cpp
+@@ -468,21 +468,41 @@ static pid_t ForkAndSpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArra
+     }
+ 
+     DropCapabilitiesBoundingSet(env);
+-
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++    bool use_native_bridge = !is_system_server && android::NativeBridgeAvailable();
++#else
+     bool use_native_bridge = !is_system_server && (instructionSet != NULL)
+-        && android::NativeBridgeAvailable();
++            && android::NativeBridgeAvailable();
++#endif
+     if (use_native_bridge) {
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++      if (instructionSet != NULL) {
++        ScopedUtfChars isa_string(env, instructionSet);
++        use_native_bridge = android::NeedsNativeBridge(isa_string.c_str());
++      } else {
++      use_native_bridge = android::NeedsNativeBridge(NULL);
++      instructionSet = env->NewStringUTF("arm"
++#ifdef __LP64__
++          "64"
++#endif
++        );
++     }
++#else
+       ScopedUtfChars isa_string(env, instructionSet);
+       use_native_bridge = android::NeedsNativeBridge(isa_string.c_str());
+-    }
++#endif
++     }
++
++#ifndef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
+     if (use_native_bridge && dataDir == NULL) {
+-      // dataDir should never be null if we need to use a native bridge.
+-      // In general, dataDir will never be null for normal applications. It can only happen in
+-      // special cases (for isolated processes which are not associated with any app). These are
+-      // launched by the framework and should not be emulated anyway.
+-      use_native_bridge = false;
+-      ALOGW("Native bridge will not be used because dataDir == NULL.");
++        // dataDir should never be null if we need to use a native bridge.
++        // In general, dataDir will never be null for normal applications. It can only happen in
++        // special cases (for isolated processes which are not associated with any app). These are
++        // launched by the framework and should not be emulated anyway.
++        use_native_bridge = false;
++        ALOGW("Native bridge will not be used because dataDir == NULL.");
+     }
++#endif
+ 
+     if (!MountEmulatedStorage(uid, mount_external, use_native_bridge)) {
+       ALOGW("Failed to mount emulated storage: %s", strerror(errno));
+@@ -515,8 +535,16 @@ static pid_t ForkAndSpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArra
+ 
+     if (use_native_bridge) {
+       ScopedUtfChars isa_string(env, instructionSet);
+-      ScopedUtfChars data_dir(env, dataDir);
+-      android::PreInitializeNativeBridge(data_dir.c_str(), isa_string.c_str());
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++      if (dataDir != NULL) {
++#endif
++          ScopedUtfChars data_dir(env, dataDir);
++          android::PreInitializeNativeBridge(data_dir.c_str(), isa_string.c_str());
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++      } else {
++          android::PreInitializeNativeBridge(NULL, isa_string.c_str());
++      }
++#endif
+     }
+ 
+     int rc = setresgid(gid, gid, gid);

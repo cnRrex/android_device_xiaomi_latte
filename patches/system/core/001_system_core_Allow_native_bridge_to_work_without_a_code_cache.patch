@@ -1,0 +1,163 @@
+From aad3af0e0e24da9c18a3c5fbff5b501c6fdfd3ae Mon Sep 17 00:00:00 2001
+From: jgu21 <jinghui.gu@intel.com>
+Date: Thu, 2 Jul 2015 12:02:11 +0800
+Subject: [PATCH] Allow native bridge to work without a code cache
+
+In isolatedProcess, the app_code_cache_dir is not needed
+for native bridge. This commit allows native bridge to work
+without a code cache in isolatedProcess.
+
+Tracked-On: https://jira01.devtools.intel.com/browse/OAM-1596
+Change-Id: I8580268d5ec6ca8d44e4500c3fafe10408e1e0d3
+Signed-off-by: jgu21 <jinghui.gu@intel.com>
+Reviewed-on: https://android.intel.com:443/406649
+---
+ libnativebridge/native_bridge.cc              | 25 +++++----
+ libnativebridge/tests/Android.mk              |  1 +
+ .../tests/CodeCacheStatFail_test.cpp          | 51 +++++++++++++++++++
+ libnativebridge/tests/NativeBridgeTest.h      |  1 +
+ 4 files changed, 68 insertions(+), 10 deletions(-)
+ create mode 100644 libnativebridge/tests/CodeCacheStatFail_test.cpp
+
+diff --git a/libnativebridge/native_bridge.cc b/libnativebridge/native_bridge.cc
+index f63497bd2..a9671a97a 100644
+--- a/libnativebridge/native_bridge.cc
++++ b/libnativebridge/native_bridge.cc
+@@ -109,6 +109,13 @@ static bool CharacterAllowed(char c, bool first) {
+   }
+ }
+ 
++static void ReleaseAppCodeCacheDir() {
++  if (app_code_cache_dir != nullptr) {
++    delete[] app_code_cache_dir;
++    app_code_cache_dir = nullptr;
++  }
++}
++
+ // We only allow simple names for the library. It is supposed to be a file in
+ // /system/lib or /vendor/lib. Only allow a small range of characters, that is
+ // names consisting of [a-zA-Z0-9._-] and starting with [a-zA-Z].
+@@ -162,8 +169,7 @@ static bool VersionCheck(const NativeBridgeCallbacks* cb) {
+ static void CloseNativeBridge(bool with_error) {
+   state = NativeBridgeState::kClosed;
+   had_error |= with_error;
+-  delete[] app_code_cache_dir;
+-  app_code_cache_dir = nullptr;
++  ReleaseAppCodeCacheDir();
+ }
+ 
+ bool LoadNativeBridge(const char* nb_library_filename,
+@@ -406,16 +412,16 @@ bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
+     if (stat(app_code_cache_dir, &st) == -1) {
+       if (errno == ENOENT) {
+         if (mkdir(app_code_cache_dir, S_IRWXU | S_IRWXG | S_IXOTH) == -1) {
+-          ALOGE("Cannot create code cache directory %s: %s.", app_code_cache_dir, strerror(errno));
+-          CloseNativeBridge(true);
++          ALOGW("Cannot create code cache directory %s: %s.", app_code_cache_dir, strerror(errno));
++          ReleaseAppCodeCacheDir();
+         }
+       } else {
+-        ALOGE("Cannot stat code cache directory %s: %s.", app_code_cache_dir, strerror(errno));
+-        CloseNativeBridge(true);
++        ALOGW("Cannot stat code cache directory %s: %s.", app_code_cache_dir, strerror(errno));
++        ReleaseAppCodeCacheDir();
+       }
+     } else if (!S_ISDIR(st.st_mode)) {
+-      ALOGE("Code cache is not a directory %s.", app_code_cache_dir);
+-      CloseNativeBridge(true);
++      ALOGW("Code cache is not a directory %s.", app_code_cache_dir);
++      ReleaseAppCodeCacheDir();
+     }
+ 
+     // If we're still PreInitialized (dind't fail the code cache checks) try to initialize.
+@@ -424,8 +430,7 @@ bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
+         SetupEnvironment(callbacks, env, instruction_set);
+         state = NativeBridgeState::kInitialized;
+         // We no longer need the code cache path, release the memory.
+-        delete[] app_code_cache_dir;
+-        app_code_cache_dir = nullptr;
++        ReleaseAppCodeCacheDir();
+       } else {
+         // Unload the library.
+         dlclose(native_bridge_handle);
+diff --git a/libnativebridge/tests/Android.mk b/libnativebridge/tests/Android.mk
+index 285e8c242..72659396c 100644
+--- a/libnativebridge/tests/Android.mk
++++ b/libnativebridge/tests/Android.mk
+@@ -9,6 +9,7 @@ include $(CLEAR_VARS)
+ test_src_files := \
+     CodeCacheCreate_test.cpp \
+     CodeCacheExists_test.cpp \
++    CodeCacheStatFail_test.cpp \
+     CompleteFlow_test.cpp \
+     InvalidCharsNativeBridge_test.cpp \
+     NativeBridge2Signal_test.cpp \
+diff --git a/libnativebridge/tests/CodeCacheStatFail_test.cpp b/libnativebridge/tests/CodeCacheStatFail_test.cpp
+new file mode 100644
+index 000000000..4ea519ee9
+--- /dev/null
++++ b/libnativebridge/tests/CodeCacheStatFail_test.cpp
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (C) 2014 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "NativeBridgeTest.h"
++
++#include <errno.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include <fcntl.h>
++
++namespace android {
++
++// Tests that the bridge is initialized without errors if the code_cache is
++// existed as a file.
++TEST_F(NativeBridgeTest, CodeCacheStatFail) {
++    int fd = creat(kCodeCache, O_RDWR);
++    ASSERT_NE(-1, fd);
++    close(fd);
++
++    struct stat st;
++    ASSERT_EQ(-1, stat(kCodeCacheStatFail, &st));
++    ASSERT_EQ(ENOTDIR, errno);
++
++    // Init
++    ASSERT_TRUE(LoadNativeBridge(kNativeBridgeLibrary, nullptr));
++    ASSERT_TRUE(PreInitializeNativeBridge(kCodeCacheStatFail, "isa"));
++    ASSERT_TRUE(InitializeNativeBridge(nullptr, nullptr));
++    ASSERT_TRUE(NativeBridgeAvailable());
++    ASSERT_FALSE(NativeBridgeError());
++
++    // Clean up
++    UnloadNativeBridge();
++
++    ASSERT_FALSE(NativeBridgeError());
++    unlink(kCodeCache);
++}
++
++}  // namespace android
+diff --git a/libnativebridge/tests/NativeBridgeTest.h b/libnativebridge/tests/NativeBridgeTest.h
+index 6a5c12636..d48942009 100644
+--- a/libnativebridge/tests/NativeBridgeTest.h
++++ b/libnativebridge/tests/NativeBridgeTest.h
+@@ -24,6 +24,7 @@
+ 
+ constexpr const char* kNativeBridgeLibrary = "libnativebridge-dummy.so";
+ constexpr const char* kCodeCache = "./code_cache";
++constexpr const char* kCodeCacheStatFail = "./code_cache/temp";
+ 
+ namespace android {
+ 

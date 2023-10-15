@@ -1,0 +1,108 @@
+From c7ac48d2bb6dd22af7713562142abea330fa9f2e Mon Sep 17 00:00:00 2001
+From: jgu21 <jinghui.gu@intel.com>
+Date: Mon, 14 Mar 2016 02:58:53 -0400
+Subject: [PATCH] Create mixins configuration for app compatibility enhancement
+ feature
+
+This feature is created for some cerner cases of
+app compatibility issue. It's disabled by default.
+To enable it, please add below lines to mixins.spec.
+Currently, it aims to handle below issues:
+
+1. All native libraries are put under assets directory.
+Some apps put their libraries under the assets directory
+in their APKs, instead of lib directory. It's not a
+problem if the ABI of app libs is matched with platform
+default ABI. But for apps with other ABIs, this feature
+must be enabled to call native bridge for help.
+
+Change-Id: I98ec4d47bee4596bfe0e9efd4cd0b6fe0c90fdf7
+Tracked-On: https://jira01.devtools.intel.com/browse/OAM-24196
+Signed-off-by: jgu21 <jinghui.gu@intel.com>
+Reviewed-on: https://android.intel.com:443/481103
+---
+ libnativebridge/Android.mk       |  4 ++--
+ libnativebridge/native_bridge.cc | 14 +++++++-------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/libnativebridge/Android.mk b/libnativebridge/Android.mk
+index d88988366..13be84e03 100644
+--- a/libnativebridge/Android.mk
++++ b/libnativebridge/Android.mk
+@@ -14,8 +14,8 @@ LOCAL_SHARED_LIBRARIES := liblog
+ LOCAL_CLANG := true
+ LOCAL_CPP_EXTENSION := .cc
+ LOCAL_CFLAGS += -Werror -Wall
+-ifeq ($(COMPATIBILITY_ENHANCEMENT_HOUDINI), true)
+-    LOCAL_CFLAGS += -D_COMPATIBILITY_ENHANCEMENT_HOUDINI_
++ifeq ($(COMPATIBILITY_ENHANCEMENT_PACKAGE), true)
++    LOCAL_CFLAGS += -D_COMPATIBILITY_ENHANCEMENT_PACKAGE_
+ endif
+ LOCAL_CPPFLAGS := -std=gnu++11 -fvisibility=protected
+ LOCAL_LDFLAGS := -ldl
+diff --git a/libnativebridge/native_bridge.cc b/libnativebridge/native_bridge.cc
+index e04db50f4..0925a229e 100644
+--- a/libnativebridge/native_bridge.cc
++++ b/libnativebridge/native_bridge.cc
+@@ -98,7 +98,7 @@ static constexpr const char* kCodeCacheDir = "code_cache";
+ 
+ static constexpr uint32_t kLibNativeBridgeVersion = 2;
+ 
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+ static bool null_instruction_set = false;
+ #endif
+ 
+@@ -249,7 +249,7 @@ static const char* kRuntimeISA = "unknown";
+ bool NeedsNativeBridge(const char* instruction_set) {
+   if (instruction_set == nullptr) {
+ 
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+     null_instruction_set = true;
+     return true;
+ #else
+@@ -271,7 +271,7 @@ bool PreInitializeNativeBridge(const char* app_data_dir_in, const char* instruct
+     return false;
+   }
+ 
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+   if (app_data_dir_in != nullptr) {
+     // Create the path to the application code cache directory.
+     // The memory will be release after Initialization or when the native bridge is closed.
+@@ -298,7 +298,7 @@ bool PreInitializeNativeBridge(const char* app_data_dir_in, const char* instruct
+   state = NativeBridgeState::kPreInitialized;
+ 
+ #ifndef __APPLE__
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+   if (null_instruction_set || instruction_set == nullptr || app_data_dir_in == nullptr) {
+ #else
+   if (instruction_set == nullptr) {
+@@ -431,7 +431,7 @@ bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
+   // point we are not multi-threaded, so we do not need locking here.
+ 
+   if (state == NativeBridgeState::kPreInitialized) {
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+     if (app_code_cache_dir != nullptr) {
+ #endif
+     // Check for code cache: if it doesn't exist try to create it.
+@@ -450,14 +450,14 @@ bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
+       ALOGW("Code cache is not a directory %s.", app_code_cache_dir);
+       ReleaseAppCodeCacheDir();
+     }
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+     }
+ #endif
+ 
+     // If we're still PreInitialized (dind't fail the code cache checks) try to initialize.
+     if (state == NativeBridgeState::kPreInitialized) {
+       if (callbacks->initialize(runtime_callbacks, app_code_cache_dir, instruction_set)) {
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+         if (!null_instruction_set) {
+           SetupEnvironment(callbacks, env, instruction_set);
+         }

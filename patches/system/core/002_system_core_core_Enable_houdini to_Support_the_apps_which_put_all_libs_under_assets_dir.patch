@@ -1,0 +1,140 @@
+From 63c87a2ed725118b6183e302f9f780da2490b557 Mon Sep 17 00:00:00 2001
+From: jgu21 <jinghui.gu@intel.com>
+Date: Thu, 2 Apr 2015 04:24:55 -0400
+Subject: [PATCH] core: Enable houdini to Support the apps which put all libs
+ under assets dir.
+
+1. Many apps in PRC market put all arm native libs under assets/ dir in
+   their APK, instead of lib/ dir.
+   Since Lollipop, PakcageManager needs clear ABI info during app
+   installation.
+   If the ABI is not supported, houdini has not chance to involve in.
+   For above kind of apps, houdini will not be loaded to help arm libs.
+   To support such kind of apps, we have to enable houdini even without
+   clear ABI info only for PRC market
+
+2. Fix GTS case failure caused by above modification,
+   which enforce to set arm ABI for all pure java
+
+NOTE: Must merged together with https://android.intel.com/449222
+
+Change-Id: I6d8cd263e3463f8e938b30f27e5db414eb2c96e9
+Tracked-On: https://jira01.devtools.intel.com/browse/OAM-12442
+Signed-off-by: jgu21 <jinghui.gu@intel.com>
+Signed-off-by: Zhou,KaiX K <kaix.k.zhou@intel.com>
+Reviewed-on: https://android.intel.com:443/449223
+---
+ libnativebridge/Android.mk       |  3 +++
+ libnativebridge/native_bridge.cc | 36 ++++++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+)
+
+diff --git a/libnativebridge/Android.mk b/libnativebridge/Android.mk
+index 83169ebc6..d88988366 100644
+--- a/libnativebridge/Android.mk
++++ b/libnativebridge/Android.mk
+@@ -14,6 +14,9 @@ LOCAL_SHARED_LIBRARIES := liblog
+ LOCAL_CLANG := true
+ LOCAL_CPP_EXTENSION := .cc
+ LOCAL_CFLAGS += -Werror -Wall
++ifeq ($(COMPATIBILITY_ENHANCEMENT_HOUDINI), true)
++    LOCAL_CFLAGS += -D_COMPATIBILITY_ENHANCEMENT_HOUDINI_
++endif
+ LOCAL_CPPFLAGS := -std=gnu++11 -fvisibility=protected
+ LOCAL_LDFLAGS := -ldl
+ LOCAL_MULTILIB := both
+diff --git a/libnativebridge/native_bridge.cc b/libnativebridge/native_bridge.cc
+index a9671a97a..e04db50f4 100644
+--- a/libnativebridge/native_bridge.cc
++++ b/libnativebridge/native_bridge.cc
+@@ -98,6 +98,10 @@ static constexpr const char* kCodeCacheDir = "code_cache";
+ 
+ static constexpr uint32_t kLibNativeBridgeVersion = 2;
+ 
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++static bool null_instruction_set = false;
++#endif
++
+ // Characters allowed in a native bridge filename. The first character must
+ // be in [a-zA-Z] (expected 'l' for "libx"). The rest must be in [a-zA-Z0-9._-].
+ static bool CharacterAllowed(char c, bool first) {
+@@ -244,8 +248,14 @@ static const char* kRuntimeISA = "unknown";
+ 
+ bool NeedsNativeBridge(const char* instruction_set) {
+   if (instruction_set == nullptr) {
++
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++    null_instruction_set = true;
++    return true;
++#else
+     ALOGE("Null instruction set in NeedsNativeBridge.");
+     return false;
++#endif
+   }
+   return strncmp(instruction_set, kRuntimeISA, strlen(kRuntimeISA) + 1) != 0;
+ }
+@@ -261,6 +271,15 @@ bool PreInitializeNativeBridge(const char* app_data_dir_in, const char* instruct
+     return false;
+   }
+ 
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++  if (app_data_dir_in != nullptr) {
++    // Create the path to the application code cache directory.
++    // The memory will be release after Initialization or when the native bridge is closed.
++    const size_t len = strlen(app_data_dir_in) + strlen(kCodeCacheDir) + 2; // '\0' + '/'
++    app_code_cache_dir = new char[len];
++    snprintf(app_code_cache_dir, len, "%s/%s", app_data_dir_in, kCodeCacheDir);
++  }
++#else
+   if (app_data_dir_in == nullptr) {
+     ALOGE("Application private directory cannot be null.");
+     CloseNativeBridge(true);
+@@ -272,13 +291,18 @@ bool PreInitializeNativeBridge(const char* app_data_dir_in, const char* instruct
+   const size_t len = strlen(app_data_dir_in) + strlen(kCodeCacheDir) + 2; // '\0' + '/'
+   app_code_cache_dir = new char[len];
+   snprintf(app_code_cache_dir, len, "%s/%s", app_data_dir_in, kCodeCacheDir);
++#endif
+ 
+   // Bind-mount /system/lib{,64}/<isa>/cpuinfo to /proc/cpuinfo.
+   // Failure is not fatal and will keep the native bridge in kPreInitialized.
+   state = NativeBridgeState::kPreInitialized;
+ 
+ #ifndef __APPLE__
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++  if (null_instruction_set || instruction_set == nullptr || app_data_dir_in == nullptr) {
++#else
+   if (instruction_set == nullptr) {
++#endif
+     return true;
+   }
+   size_t isa_len = strlen(instruction_set);
+@@ -407,6 +431,9 @@ bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
+   // point we are not multi-threaded, so we do not need locking here.
+ 
+   if (state == NativeBridgeState::kPreInitialized) {
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++    if (app_code_cache_dir != nullptr) {
++#endif
+     // Check for code cache: if it doesn't exist try to create it.
+     struct stat st;
+     if (stat(app_code_cache_dir, &st) == -1) {
+@@ -423,11 +450,20 @@ bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
+       ALOGW("Code cache is not a directory %s.", app_code_cache_dir);
+       ReleaseAppCodeCacheDir();
+     }
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++    }
++#endif
+ 
+     // If we're still PreInitialized (dind't fail the code cache checks) try to initialize.
+     if (state == NativeBridgeState::kPreInitialized) {
+       if (callbacks->initialize(runtime_callbacks, app_code_cache_dir, instruction_set)) {
++#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++        if (!null_instruction_set) {
++          SetupEnvironment(callbacks, env, instruction_set);
++        }
++#else
+         SetupEnvironment(callbacks, env, instruction_set);
++#endif
+         state = NativeBridgeState::kInitialized;
+         // We no longer need the code cache path, release the memory.
+         ReleaseAppCodeCacheDir();

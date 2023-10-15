@@ -1,0 +1,87 @@
+From 4c7f26721dbb9934eec9ed8b880800e0d5928f00 Mon Sep 17 00:00:00 2001
+From: jgu21 <jinghui.gu@intel.com>
+Date: Mon, 14 Mar 2016 02:56:10 -0400
+Subject: [PATCH] Create mixins configuration for app compatibility enhancement
+ feature
+
+This feature is created for some corner cases of
+app compatibility issue. It's disabled by default.
+To enable it, please add below lines to mixins.spec.
+Currently, it aims to handle below issues:
+
+1. All native libraries are put under assets directory.
+Some apps put their libraries under the assets directory
+in their APKs, instead of lib directory. It's not a
+problem if the ABI of app libs is matched with platform
+default ABI. But for apps with other ABIs, this feature
+must be enabled to call native bridge for help.
+
+Change-Id: I56cd60ade4778094e2b14fc38aa51d0eb0f0d40f
+Tracked-On: https://jira01.devtools.intel.com/browse/OAM-24196
+Signed-off-by: jgu21 <jinghui.gu@intel.com>
+Reviewed-on: https://android.intel.com:443/481102
+---
+ core/jni/Android.mk                         |  4 ++++
+ core/jni/com_android_internal_os_Zygote.cpp | 10 +++++-----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/core/jni/Android.mk b/core/jni/Android.mk
+index 884c4c790fd..3a69678a78d 100644
+--- a/core/jni/Android.mk
++++ b/core/jni/Android.mk
+@@ -274,6 +274,10 @@ ifeq ($(PRC_COMPATIBILITY_PACKAGE),true)
+         cp -f $(LOCAL_PATH)/abipicker/ThirdPartySO $(TARGET_OUT_VENDOR)/etc/misc/.ThirdPartySO
+ endif
+ 
++ifeq ($(COMPATIBILITY_ENHANCEMENT_PACKAGE), true)
++    LOCAL_CFLAGS += -D_COMPATIBILITY_ENHANCEMENT_PACKAGE_
++endif
++
+ # we need to access the private Bionic header
+ # <bionic_tls.h> in com_google_android_gles_jni_GLImpl.cpp
+ LOCAL_C_INCLUDES += bionic/libc/private
+diff --git a/core/jni/com_android_internal_os_Zygote.cpp b/core/jni/com_android_internal_os_Zygote.cpp
+index cd23c64e06f..8b98a42a403 100644
+--- a/core/jni/com_android_internal_os_Zygote.cpp
++++ b/core/jni/com_android_internal_os_Zygote.cpp
+@@ -468,14 +468,14 @@ static pid_t ForkAndSpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArra
+     }
+ 
+     DropCapabilitiesBoundingSet(env);
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+     bool use_native_bridge = !is_system_server && android::NativeBridgeAvailable();
+ #else
+     bool use_native_bridge = !is_system_server && (instructionSet != NULL)
+             && android::NativeBridgeAvailable();
+ #endif
+     if (use_native_bridge) {
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+       if (instructionSet != NULL) {
+         ScopedUtfChars isa_string(env, instructionSet);
+         use_native_bridge = android::NeedsNativeBridge(isa_string.c_str());
+@@ -493,7 +493,7 @@ static pid_t ForkAndSpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArra
+ #endif
+      }
+ 
+-#ifndef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifndef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+     if (use_native_bridge && dataDir == NULL) {
+         // dataDir should never be null if we need to use a native bridge.
+         // In general, dataDir will never be null for normal applications. It can only happen in
+@@ -535,12 +535,12 @@ static pid_t ForkAndSpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArra
+ 
+     if (use_native_bridge) {
+       ScopedUtfChars isa_string(env, instructionSet);
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+       if (dataDir != NULL) {
+ #endif
+           ScopedUtfChars data_dir(env, dataDir);
+           android::PreInitializeNativeBridge(data_dir.c_str(), isa_string.c_str());
+-#ifdef _COMPATIBILITY_ENHANCEMENT_HOUDINI_
++#ifdef _COMPATIBILITY_ENHANCEMENT_PACKAGE_
+       } else {
+           android::PreInitializeNativeBridge(NULL, isa_string.c_str());
+       }

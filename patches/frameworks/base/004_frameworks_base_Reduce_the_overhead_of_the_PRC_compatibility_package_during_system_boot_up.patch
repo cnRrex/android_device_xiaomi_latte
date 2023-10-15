@@ -1,0 +1,893 @@
+From eaafcb1b38491415aaeb8319014705419c821817 Mon Sep 17 00:00:00 2001
+From: xiajiang <xia1.jiang@intel.com>
+Date: Mon, 21 Mar 2016 12:26:06 -0400
+Subject: [PATCH] Reduce the overhead of the PRC compatibility package feature
+ during system bootup
+
+The PRC compatibility package introduced too heavy overhead
+in system bootup. This commit aims to reduce the overhead
+in system bootup and improve the performance of PRC
+compatibility package.
+
+NOTE: The format of ThirdPartySO has been changed to improve
+the performance. From now on, the lib name should be trimmed
+as below if want to add into the list. For "libabc_v1_2_3.so",
+add "abc_v" into the list, that is, the version information
+at the tail of lib name should be removed.
+
+Change-Id: Ic374e363d3d31f9bd69be839b33b1bd65950ef61
+Tracked-On:https://jira01.devtools.intel.com/browse/OAM-25819
+Signed-off-by: xiajiang <xia1.jiang@intel.com>
+Reviewed-on: https://android.intel.com:443/484542
+---
+ .../internal/content/NativeLibraryHelper.java |  33 +++-
+ core/jni/abipicker/ABIPicker.cpp              | 131 +++++++++----
+ core/jni/abipicker/ABIPicker.h                |   2 +
+ core/jni/abipicker/ThirdPartySO               | 172 +++++++++++-------
+ ...d_internal_content_NativeLibraryHelper.cpp |  60 ++++--
+ 5 files changed, 274 insertions(+), 124 deletions(-)
+
+diff --git a/core/java/com/android/internal/content/NativeLibraryHelper.java b/core/java/com/android/internal/content/NativeLibraryHelper.java
+index 851d97b9b03..063a5e67a0b 100644
+--- a/core/java/com/android/internal/content/NativeLibraryHelper.java
++++ b/core/java/com/android/internal/content/NativeLibraryHelper.java
+@@ -77,7 +77,7 @@ public static class Handle implements Closeable {
+         final boolean multiArch;
+         final boolean extractNativeLibs;
+         final String pkgName;
+-
++        final String apkDir;
+         public static Handle create(File packageFile) throws IOException {
+             try {
+                 final PackageLite lite = PackageParser.parsePackageLite(packageFile, 0);
+@@ -88,17 +88,31 @@ public static Handle create(File packageFile) throws IOException {
+         }
+ 
+         public static Handle create(Package pkg) throws IOException {
++            String apkdir;
++            if ((pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0) {
++                apkdir = null;
++            } else {
++                apkdir = pkg.codePath;
++            }
+             return create(pkg.getAllCodePaths(),
+                     (pkg.applicationInfo.flags & ApplicationInfo.FLAG_MULTIARCH) != 0,
+-                    (pkg.applicationInfo.flags & ApplicationInfo.FLAG_EXTRACT_NATIVE_LIBS) != 0, pkg.packageName);
++                    (pkg.applicationInfo.flags & ApplicationInfo.FLAG_EXTRACT_NATIVE_LIBS) != 0, pkg.packageName, apkdir);
+         }
+ 
+         public static Handle create(PackageLite lite) throws IOException {
+-            return create(lite.getAllCodePaths(), lite.multiArch, lite.extractNativeLibs,lite.packageName);
++            String apkdir;
++            if (lite.codePath.startsWith("/system/") ||
++                lite.codePath.startsWith("/vendor/") ||
++                lite.codePath.startsWith("/oem/")) {
++                apkdir = null;
++            } else {
++                apkdir = lite.codePath;
++            }
++            return create(lite.getAllCodePaths(), lite.multiArch, lite.extractNativeLibs,lite.packageName,apkdir);
+         }
+ 
+         private static Handle create(List<String> codePaths, boolean multiArch,
+-                boolean extractNativeLibs,String pkgName) throws IOException {
++                boolean extractNativeLibs, String pkgName, String apkDir) throws IOException {
+             final int size = codePaths.size();
+             final long[] apkHandles = new long[size];
+             for (int i = 0; i < size; i++) {
+@@ -113,14 +127,15 @@ private static Handle create(List<String> codePaths, boolean multiArch,
+                 }
+             }
+ 
+-            return new Handle(apkHandles, multiArch, extractNativeLibs, pkgName);
++            return new Handle(apkHandles, multiArch, extractNativeLibs, pkgName, apkDir);
+         }
+ 
+-        Handle(long[] apkHandles, boolean multiArch, boolean extractNativeLibs, String pkgName) {
++        Handle(long[] apkHandles, boolean multiArch, boolean extractNativeLibs, String pkgName, String apkDir) {
+             this.apkHandles = apkHandles;
+             this.multiArch = multiArch;
+             this.extractNativeLibs = extractNativeLibs;
+-            this.pkgName=pkgName;
++            this.pkgName = pkgName;
++            this.apkDir = apkDir;
+             mGuard.open("close");
+         }
+ 
+@@ -195,7 +210,7 @@ public static int findSupportedAbi(Handle handle, String[] supportedAbis) {
+         for (long apkHandle : handle.apkHandles) {
+             int res;
+             if (true) {
+-                res = nativeFindSupportedAbiReplace(apkHandle, supportedAbis, handle.pkgName);
++                res = nativeFindSupportedAbiReplace(apkHandle, supportedAbis, handle.pkgName, handle.apkDir);
+             } else {
+                 res = nativeFindSupportedAbi(apkHandle, supportedAbis);
+             }
+@@ -223,7 +238,7 @@ public static int findSupportedAbi(Handle handle, String[] supportedAbis) {
+ 
+     private native static int nativeFindSupportedAbi(long handle, String[] supportedAbis);
+ 
+-    private native static int nativeFindSupportedAbiReplace(long handle, String[] supportedAbis,String pkgName);
++    private native static int nativeFindSupportedAbiReplace(long handle, String[] supportedAbis,String pkgName, String apkDir);
+     // Convenience method to call removeNativeBinariesFromDirLI(File)
+     public static void removeNativeBinariesLI(String nativeLibraryPath) {
+         if (nativeLibraryPath == null) return;
+diff --git a/core/jni/abipicker/ABIPicker.cpp b/core/jni/abipicker/ABIPicker.cpp
+index 8fffc7cc137..58d89fc6763 100644
+--- a/core/jni/abipicker/ABIPicker.cpp
++++ b/core/jni/abipicker/ABIPicker.cpp
+@@ -40,11 +40,12 @@ static bool thirdload = false;
+ static bool whiteload = false;
+ static bool blackload = false;
+ 
+-static const char* iaRelated[] = {"intel", "atom", "x86", "x64"};
++static const char* iaRelated[] = {"intel", "intl", "atom", "x86", "x64"};
+ 
+ //////////////////////////////////////////////////////////////////////
+ void getConfig(const char* cfgFile , Vector<char*>& cfgVec) {
+     FILE* fp = fopen(cfgFile, "r");
++    assert(fp != NULL);
+     int read = -1;
+     char *line = NULL;
+     size_t len = 0;
+@@ -133,8 +134,14 @@ bool isReliableLib(Vector<char*>& libList) {
+     int len = ARR_SIZE(iaRelated);
+     for (unsigned i = 0; i < sz; i++) {
+         for (int j=0; j < len; j++) {
+-            if (NULL != strstr(libList[i], iaRelated[j])) {
+-                return true;
++            char* p = NULL;
++            if (NULL != (p = strcasestr(libList[i], iaRelated[j]))) {
++                int lenIA = strlen(iaRelated[j]);
++                if (!isalpha(*(p+lenIA))) {
++                    if (!isalpha(*(p-1)) || (p == (libList[i] + 3))) {
++                        return true;
++                    }
++                }
+             }
+         }
+     }
+@@ -169,21 +176,47 @@ static bool isMixedLib(char* libCur, char* buffer) {
+     return mixed;
+ }
+ 
++// compare the given string with the length, igonre upper and lower
++// len must be less than the length of two string
++static bool ignoreCmp(const char* str1, const char* str2, int len){
++    assert (str1 != NULL && str2 != NULL);
++    assert ((len <= strlen(str1)) && (len <= strlen(str2)));
++    for (int i = 0 ; i < len; i++) {
++        if (str1[i] != str2[i]) {
++            if(isalpha(str1[i]) && isalpha(str2[i])
++                    && (abs((str1[i]-str2[i])) == 32)) {
++                continue;
++            }
++            return false;
++        }
++    }
++    return true;
++}
++
+ static bool isInThirdPartySOList(char* libName) {
+-    if (!libName) return false;
++    assert (libName != NULL);
+     size_t libLen = strlen(libName);
+-    bool ret = false;
+     size_t sz = thirdPartySO.size();
+     for (size_t i = 0; i < sz; i++) {
++        // thirdPartySO[i] won't be NULL
+         size_t n = strlen(thirdPartySO[i]);
+-        // three for prefix "lib", and 3 for suffix ".so"
+-        if ((libLen == (n+6))&&(0 == strncmp(libName + 3, thirdPartySO[i], n))) {
+-            ret = true;
+-            break;
++        // three char for ".so"
++        int j = libLen - 4;
++        // now only '-' '-' and '.'found
++        while((j >= 0) && (isdigit(libName[j]) || (libName[j] == '-')
++              || (libName[j] == '_') || (libName[j] == '.'))) {
++            j--;
+         }
++        // three char for "lib" and include the name with no letters
++        if ((j == 2) || ((size_t)j == (n+2))) {
++            if (ignoreCmp(libName+3, thirdPartySO[i], n)) {
++                P_LOG("ABIpicker libName %s,In Third", libName);
++                return true;
++            }
++        }
++
+     }
+-    P_LOG("ABIpicker libName %s,In Third %d", libName, ret);
+-    return ret;
++    return false;
+ }
+ 
+ static void insertionSort(Vector<char*>& list) {
+@@ -206,9 +239,9 @@ static void insertionSort(Vector<char*>& list) {
+ 
+ //////////////////////////////////////////////////////////////////////
+ // Use armRef as a reference, compare all libraries of iaRef with all
+-// libraries of armRef. If both are match, iaRef will be returned with
+-// *result and true is return value. Or else, *result is rawResult and
+-// false is return value
++// libraries of armRef.If the two are match or iaRef is more, iaRef
++// will be returned with *result and true is return value. Or else,
++// *result is rawResult and false is return value
+ bool ABIPicker::compare(char* armRef, char* iaRef,
+                         char* rawResult, char** result) {
+     bool ret = true;
+@@ -232,6 +265,8 @@ bool ABIPicker::compare(char* armRef, char* iaRef,
+         Vector<char*>* armRefList = getLibList(armRef);
+ 
+         // if contains the key words in iaRelated, just return true
++        assert(iaRefList != NULL);
++        assert(armRefList != NULL);
+         if (isReliableLib(*iaRefList)) {
+             *result = iaRef;
+             break;
+@@ -258,7 +293,7 @@ bool ABIPicker::compare(char* armRef, char* iaRef,
+ 
+         *result = armRef;
+         ret = false;
+-    } while (false);
++    } while (0);
+ 
+     ALOGV("%s Vs. %s, return %s\n",
+             iaRef ? iaRef : "NULL",
+@@ -268,28 +303,48 @@ bool ABIPicker::compare(char* armRef, char* iaRef,
+ 
+ bool ABIPicker::compareLibList(Vector<char*>& iaRefList,
+         Vector<char*>& armRefList) {
+-    if (iaRefList.size() != armRefList.size()) {
++
++    unsigned iaSize = iaRefList.size();
++    unsigned armSize = armRefList.size();
++    if (iaSize < armSize) {
+         return false;
++    } else if (iaSize == 0 && armSize == 0) {
++        return true;
+     }
+ 
++    int iaNum = 0;
++    int armNum = 0;
+     Vector<char*>::iterator itIa = iaRefList.begin();
+     Vector<char*>::iterator itArm = armRefList.begin();
++    bool isEqual = false;
+     while (itIa != iaRefList.end() && itArm != armRefList.end()) {
+-        char* iaLibName = *itIa;
+-        char* armLibName = *itArm;
+-
+-        // NOTE:
+-        // WIN treats file names in-case-sensitive,
+-        // but LINUX  treats them case-sensitive.
+-        if (0 != strcmp(iaLibName, armLibName)) {
++        if ((iaSize-iaNum) < (armSize-armNum)) {
+             return false;
+         }
+-
+-        itIa++;
++        isEqual = false ;
++        char* armLibName = *itArm;
++        int armLen = strlen (armLibName);
++        armNum++;
++
++        while (itIa != iaRefList.end() && !isEqual) {
++            char* iaLibName = *itIa;
++            iaNum++;
++            int iaLen = strlen (iaLibName);
++            if (iaLen == armLen) {
++                if (ignoreCmp(iaLibName, armLibName, iaLen)) {
++                    isEqual = true;
++                }
++            }
++            itIa++; 
++        }
+         itArm++;
+     }
+-
+-    return true;
++    // till the end, and the last result is equal
++    if (itArm == armRefList.end() && isEqual){
++        return true;
++    } else {
++        return false;
++    }
+ }
+ 
+ bool ABIPicker::compare3rdPartyLibList(
+@@ -297,6 +352,8 @@ bool ABIPicker::compare3rdPartyLibList(
+                 size_t* iaIsvLibCount, size_t* armIsvLibCount) {
+     Vector<char*>* iaRefList = getLibList(iaRef);
+     Vector<char*>* armRefList = getLibList(armRef);
++    assert(iaRefList != NULL);
++    assert(armRefList != NULL);
+ 
+     Vector<char*>* armRef3rdPartyLibList = new Vector<char*>();
+     Vector<char*>::iterator itArm = armRefList->begin();
+@@ -329,7 +386,12 @@ bool ABIPicker::compare3rdPartyLibList(
+ 
+         itIa++;
+     }
+-    return compareLibList(*iaRef3rdPartyLibList, *armRef3rdPartyLibList);
++    bool result = compareLibList(*iaRef3rdPartyLibList, *armRef3rdPartyLibList);
++
++    //release the memory
++    free(armRef3rdPartyLibList);
++    free(iaRef3rdPartyLibList);
++    return result;
+ }
+ 
+ char* ABIPicker::getAbiName(int abi) {
+@@ -415,7 +477,7 @@ ABIPicker::ABIPicker(const char* pkgName, Vector<ScopedUtfChars*> abiList) {
+     if (!mpkgName) {
+         P_LOG("ABIPicker Construct Allocated space fails");
+     } else {
+-        strcpy(mpkgName, pkgName);
++        snprintf(mpkgName, strlen(pkgName)+1, "%s", pkgName);
+     }
+     Vector<ScopedUtfChars*>::iterator it = abiList.begin();
+     while (it != abiList.end()) {
+@@ -456,6 +518,7 @@ ABIPicker::~ABIPicker(void) {
+         it++;
+     }
+     mLibList->clear();
++    delete(mLibList);
+ }
+ 
+ bool ABIPicker::buildNativeLibList(void* apkHandle) {
+@@ -515,7 +578,7 @@ bool ABIPicker::buildNativeLibList(void* apkHandle) {
+             ret = false;
+             break;
+         }
+-
++        memset(unCompBuff, 0, unCompLen);
+         // THE MOST TIME COST OPERATION
+         if (!zipFile->uncompressEntry(next, unCompBuff, unCompLen)) {
+             ALOGE("%s: uncompress failed\n", fileName);
+@@ -577,7 +640,7 @@ bool ABIPicker::buildNativeLibList(void* apkHandle) {
+                     ret = false;
+                     break;
+                 }
+-                strcpy(mixedLib, (char*)IMPOSSIBLE_LIB_NAME);
++                snprintf(mixedLib, (IMPOSSIBLE_LIB_LEN+1), "%s", IMPOSSIBLE_LIB_NAME);
+                 mixedLib[IMPOSSIBLE_LIB_LEN] ='\0';
+                 libListOfCurAbi->push_back(mixedLib);
+                 continue;
+@@ -593,7 +656,7 @@ bool ABIPicker::buildNativeLibList(void* apkHandle) {
+             ret = false;
+             break;
+         }
+-        strcpy(curLibName, lastSlash);
++        snprintf(curLibName,libNameSize+1, "%s", lastSlash);
+         curLibName[libNameSize] = '\0';
+ 
+         libListOfCurAbi->push_back(curLibName);
+@@ -686,13 +749,13 @@ int ABIPicker::pickupRightABI(int sysPrefer) {
+         if (is64BitPrefer) {
+             if (!compare(arm64Ref, ia64Ref, sysPreferAbiName, &retAbiName)) {
+                 char rawRes[ABI_NAME_MAX_LENGTH];
+-                strcpy(rawRes, retAbiName);
++                snprintf(rawRes, ABI_NAME_MAX_LENGTH, "%s", retAbiName);
+                 compare(arm32Ref, ia32Ref, rawRes, &retAbiName);
+             }
+         } else {
+             compare(arm32Ref, ia32Ref, sysPreferAbiName, &retAbiName);
+         }
+-    } while (false);
++    } while (0);
+     int ret = getAbiIndex(retAbiName);
+     ALOGI("selected abi %s(%d) for %s", retAbiName, ret, mpkgName);
+     return ret;
+diff --git a/core/jni/abipicker/ABIPicker.h b/core/jni/abipicker/ABIPicker.h
+index 36453644b6a..0ddf1ceae15 100644
+--- a/core/jni/abipicker/ABIPicker.h
++++ b/core/jni/abipicker/ABIPicker.h
+@@ -8,6 +8,8 @@
+ 
+ #include <ScopedUtfChars.h>
+ #include <assert.h>
++#include <string.h>
++
+ namespace android {
+ //  assumption: the length of name of any abi type in abi list,
+ //  like armeabi-v7a, armeabi, x86, is not longer than 64
+diff --git a/core/jni/abipicker/ThirdPartySO b/core/jni/abipicker/ThirdPartySO
+index 81cf0703124..76e47ff6372 100644
+--- a/core/jni/abipicker/ThirdPartySO
++++ b/core/jni/abipicker/ThirdPartySO
+@@ -7,23 +7,22 @@ ads
+ aisound
+ aitalk
+ almixer
+-amapv3
+-amapv301
++amapv
+ amapv301ex
++amapv304ex
+ amrcodec
+ amrnb
+ analytics
+ andengine
+ andenginephysicsbox2dextension
+-androidgl20
+-app_baidumapapplib_v2_0_0
+-app_baidumapapplib_v2_1_0
+-app_baidumapapplib_v2_1_1
+-app_baidumapapplib_v2_1_2
++andfix
++androidgl
++app_baidumapapplib_v
+ app_baidunaviapplib
+ application
+ arm
+ armplugin
++art
+ avcodec
+ avdevice
+ avfilter
+@@ -32,41 +31,36 @@ aviary_exif
+ aviary_moalite
+ aviary_native
+ avutil
+-baidumapsdk_v2_1_3
+-baidumapsdk_v2_2_0
+-baidumapsdk_v2_3_0
+-baidumapsdk_v2_3_1
+-baidumapsdk_v2_3_5
+-baidumapvos_v2_1_3
+-bdmoplusmd5_v1
+-bdpush_v1_0
+-bdvoicerecognitionclient_v1
+-bdvoicesearchclient_v2
++baidumapsdk_v
++baidumapvos_v
++baiduprotect
++base
++bdmoplusmd
++bdpush_v
++bdvoicerecognitionclient_v
++bdvoicesearchclient_v
++blas
++blur
+ bmapapiengine
+-bmapapiengine_v1_3_0
+-bmapapiengine_v1_3_1
+-bmapapiengine_v1_3_2
+-bmapapiengine_v1_3_3
+-bmapapiengine_v1_3_4
+-bmapapiengine_v1_3_5
++bmapapiengine_v
+ box2d
+ bspatch
+-bspatch
+ bullet
+ cardiodecider
+ cardiorecognizer
+-cardiorecognizer_tegra2
++cardiorecognizer_tegra
+ casdkjni
+ cat
+ cftutils
+ chaosvmp
+-chatscript001
++chatscript
+ chipmunk
++cilkrts
+ cnpackage
+ cocos2d
+ cocos2dcpp
+ cocosdenshion
+-cocosdenshion
++compiler_rt
+ core
+ corona
+ coronaprovider.gamenetwork.corona
+@@ -75,32 +69,39 @@ crittercism-ndk
+ crypto
+ cryptox
+ curl
++cutils
+ cyberplayer
+ cyberplayer-core
+ database_sqlcipher
+-dejavu-1.0.1
++dejavu
+ des
+ dexhelper
+-dexhelper-x86
+ dianjin-jni
+ dodo
++drm
+ dropboxsync
++EGL
+ ejtts
+ emu
+ emumedia
+ encode
++encrypt
+ entryex
+ exec
+ execmain
++exif
+ exif_extended
++expat
+ faceppapi
+ fastpay
+ fb_jpegturbo
+ ffmpeg
+-ffmpeg001
++ffmpeg_jni_neon
++ffmpeg_neon
+ fmodevent
+ fmodex
+ freetype
++ft
+ game
+ game_logic
+ gamenetwork
+@@ -109,9 +110,13 @@ gbd
+ gdx
+ gdx-freetype
+ gif
++GLESv
++GLESv1_CM
+ gnustl_shared
+ gpuimage-library
++gui
+ gwallet
++harfbuzz_ng
+ hci_asr
+ hci_asr_jni
+ hci_sys
+@@ -122,14 +127,20 @@ hci_tts_local_n6_synth
+ hellolua
+ iap
+ iconv
++icui18n
++icuuc
+ identifyapp
++img_utils
+ immemulatorj
+ increment
+ iomx-gingerbread
+ iomx-hc
+ iomx-ics
++iprouteutil
++javacrypt
++jhead
++jhead_jni
+ jni
+-jni_latinime
+ jniavcodec
+ jniavdevice
+ jniavfilter
+@@ -137,12 +148,14 @@ jniavformat
+ jniavutil
+ jnicvkernels
+ jnigraphics
++jni_latinime
+ jniopencv_core
+ jniopencv_imgproc
+ jnipostproc
+ jniswresample
+ jniswscale
+-jnlua5.1
++jnlua
++jpeg
+ jpush
+ json
+ jtopus
+@@ -155,65 +168,61 @@ lept
+ letter_xiaokun.n6.voclib
+ licensing
+ litedes
+-locsdk_2.2
+-locsdk_2.3
+-locsdk_2.4
+-locsdk_2_4
+-locsdk3
+-locsdk4
++LLVM
++locsdk
+ locsdk4b
++locSDK4d
++locSDK6a
+ lptcpjin
+-lthj_unipaybusiness20121012
+-lthj_unipaybusiness20121217
+-lthj_unipaybusiness20130328
++lthj_unipaybusiness
+ lua
+ luajava
++m
+ mad
+ main
+ mame4all
+ mame4all-jni
+ mapv3ex
+-md5
++md
++mdnssd
++media
+ megjb
+-minimapv320
++minimapv
+ mmdb
+ mmsdkjni
+ mobage
+ mono
+ monodroid
+-moplusmd5
++moplusmd
+ mp3lame
+-mpg123
++mpg
+ msc
+ msfboot
++mtp
+ native
+ nativerqd
+ nes
+ nexadaptation_layer_for_dlsdk
+ nexalfactory
+-nexcal_aac_armv5
+-nexcal_aac_armv6
+-nexcal_aac_armv7
++nexcal_aac_armv
+ nexcal_closedcaption
+-nexcal_h264_armv5
+-nexcal_h264_armv6
+-nexcal_h264_armv7
+-nexcal_mp3_armv6
++nexcal_h264_armv
++nexcal_mp3_armv
+ nexcal_qcom_iomx
+ nexcal_ttml
+ nexcralbody_mc_jb
+ nexplayerengine
+-nexral_nw_jb
+-nexral_surf_gb
+ nexralbody_audio
+ nexralbody_audio_jb
+ nexralbody_video_cu
+ nexralbody_video_fr
+-nexralbody_video_fr3
+ nexralbody_video_hc
+ nexralbody_video_is
+ nexralbody_video_jb
+ nexralbody_video_opengl
++nexral_nw_jb
++nexral_surf_gb
++nl
+ nmsp_speex
+ objc
+ ocrengine
+@@ -221,88 +230,113 @@ ogg
+ openal
+ opencv_core
+ opencv_imgproc
++OpenMAXAL
+ opensles
++opus
++pac
++pagemap
++parameter
+ paypalm_app_plugin_jar_360game
++pciaccess
++pcre
++pdfium
+ pinguoimagesdk
+ pjsipjni
++pl_droidsonroids_gif
+ plugins
++png
+ protectclass
+ protobuf
+ push-socket
+ qrcodedecoder
+ qvodbase
+ qvodnetjni
++radio
+ redlaser
++RS
++RScpp
++RSCpuRef
++RSDriver
+ rsjni
+-rssupport
++rs_jni
++RSSupport
+ rtmp
+ s3eandroidmarketbilling_ext
+-sapi_so_1
++sapi_so
+ sdl
+ sdl_image
+ sdl_main
+ sdl_mixer
+ secexe
+-secexe.x86
+ secmain
+-secmain.x86
+ security
++skia
+ smsiap
+ smsprotocol
++soni
++sonivox
+ soundtouch
+-soundtouch
+-soundtouch001
+ speex
++speexresampler
+ sqlcipher_android
+-sqlite3
++sqlite
+ ssl
+ stagefright_froyo
+ stagefright_honeycomb
++stdc++
+ stlport_shared
+ swresample
+ swscale
+ sync
+ sys
+-sys1.3.3
+ tbb
+ tbt
+ tenpay_utils
+ tersafe
+ tess
+ tests
++tinyalsa
++tinycompress
++tinyxml
+ top-sdk
+ uffmpeg
+ unionpay
+ unity
++unwind
+ usedes
+ ustoolkit
+ util
+ utility
++utils
++va
+ vadlib
+-vi_voslib
++va-tpi
+ vinit
+-voandroidvr_s20
+-voandroidvr_s22
+-voandroidvr_s23
++vi_voslib
++vixl
++voandroidvr_s
+ voh264dec
+-voh264dec_v7
++voh264dec_v
+ vorbis
+ vorbisidec
+ voswrapper
+ vpx
+ webp
++weibosdkcore
+ wiengine
+ wiengine_binding
++wilhelm
+ winetwork
+ wiskia
+ wisound
+ xiaokun.n6.voclib
+-xml2
++xml
+ xmp
+ yeepaysdk
+ ysshared
+ yyutil
+ yzs_usc
++z
+ zbarjni
+ zip
+ zxing-new
+diff --git a/core/jni/com_android_internal_content_NativeLibraryHelper.cpp b/core/jni/com_android_internal_content_NativeLibraryHelper.cpp
+index 7fc86471a61..dc8ac2ffc5e 100644
+--- a/core/jni/com_android_internal_content_NativeLibraryHelper.cpp
++++ b/core/jni/com_android_internal_content_NativeLibraryHelper.cpp
+@@ -610,40 +610,76 @@ com_android_internal_content_NativeLibraryHelper_findSupportedAbi_replace(
+         jclass clazz,
+         jlong apkHandle,
+         jobjectArray javaCpuAbisToSearch,
+-        jstring apkPkgName)
++        jstring apkPkgName,
++        jstring apkDir)
+ {
+ #ifdef _PRC_COMPATIBILITY_PACKAGE_
++
++    int abiType = findSupportedAbi(env, apkHandle, javaCpuAbisToSearch);
++    if (apkDir == NULL) {
++        return (jint)abiType;
++    }
++
++    char abiFlag[256] = {'\0'};
++    ScopedUtfChars apkdir(env, apkDir);
++    size_t apkdir_size = apkdir.size();
+     const int numAbis = env->GetArrayLength(javaCpuAbisToSearch);
+     Vector<ScopedUtfChars*> supportedAbis;
++
++    assert(apkdir_size < 256 - 15);
++    strcpy(abiFlag, apkdir.c_str());
++    abiFlag[apkdir_size] = '/';
++    abiFlag[apkdir_size + 1] = '.';
+     for (int i = 0; i < numAbis; i++) {
+         ScopedUtfChars* abiName = new ScopedUtfChars(env,
+-                 (jstring)env->GetObjectArrayElement(
+-                     javaCpuAbisToSearch, i));
++                 (jstring)env->GetObjectArrayElement(javaCpuAbisToSearch, i));
++        if (strlcpy(abiFlag + apkdir_size + 2, abiName->c_str(), 256 - apkdir_size - 2)
++                == abiName->size()) {
++            if (access(abiFlag, F_OK) == 0) {
++                abiType = i;
++                for (int j = 0; j < i; ++j) {
++                    delete supportedAbis[j];
++                }
++                delete abiName;
++                return (jint)abiType;
++            }
++        }
++
+         supportedAbis.push_back(abiName);
+     }
+ 
+-    int abiType = findSupportedAbi(env, apkHandle, javaCpuAbisToSearch);
+     do {
++        if (abiType < 0 || abiType >= numAbis ){
++            break;
++        }
++
++        if (0 != strcmp(supportedAbis[abiType]->c_str(), X86ABI) &&
++                0 != strcmp(supportedAbis[abiType]->c_str(), X8664ABI)) {
++            break;
++        }
+ 
+-        if (abiType < 0 || abiType >= numAbis ) break ;
+-       // if one package's name is on OEM's specific white list, then the
+-        // package should be installed as default
+         ScopedUtfChars name(env, apkPkgName);
+-         if (isInOEMWhiteList(name.c_str())) {
++        if (NULL == name.c_str()) {
+             break;
+         }
+ 
+-        if (0 != strcmp(supportedAbis[abiType]->c_str(), X86ABI) &&
+-            0 != strcmp(supportedAbis[abiType]->c_str(), X8664ABI)){
++        if (isInOEMWhiteList(name.c_str())) {
+             break;
+         }
++
+         ABIPicker picker(name.c_str(),supportedAbis);
+         if (!picker.buildNativeLibList((void*)apkHandle)) {
+             break;
+         }
+ 
+         abiType = picker.pickupRightABI(abiType);
+-    } while (false);
++        if (abiType >= 0 && abiType < numAbis &&
++                (strlcpy(abiFlag + apkdir_size + 2, supportedAbis[abiType]->c_str(),
++                         256 - apkdir_size - 2) == supportedAbis[abiType]->size())) {
++            creat(abiFlag, 0644);
++        }
++
++    } while(0);
+ 
+     for (int i = 0; i < numAbis; ++i) {
+         delete supportedAbis[i];
+@@ -721,7 +757,7 @@ static JNINativeMethod gMethods[] = {
+     {"hasRenderscriptBitcode", "(J)I",
+             (void *)com_android_internal_content_NativeLibraryHelper_hasRenderscriptBitcode},
+     {"nativeFindSupportedAbiReplace",
+-            "(J[Ljava/lang/String;Ljava/lang/String;)I",
++            "(J[Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I",
+             (void *)com_android_internal_content_NativeLibraryHelper_findSupportedAbi_replace},
+ };
+ 
