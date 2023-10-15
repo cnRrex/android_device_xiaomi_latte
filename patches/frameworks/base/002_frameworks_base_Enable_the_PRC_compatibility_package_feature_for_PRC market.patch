@@ -988,15 +988,18 @@ new file mode 100644
 index 00000000000..5dfbf4eead2
 --- /dev/null
 +++ b/core/jni/abipicker/OEMBlackList
-@@ -0,0 +1 @@
+@@ -0,0 +1,3 @@
++com.cht.ottPlayer
 +com.ilongyuan.implosion*
++sh.ppy.osulazer*
 diff --git a/core/jni/abipicker/OEMWhiteList b/core/jni/abipicker/OEMWhiteList
 new file mode 100644
 index 00000000000..d7f48988e3a
 --- /dev/null
 +++ b/core/jni/abipicker/OEMWhiteList
-@@ -0,0 +1 @@
+@@ -0,0 +1,2 @@
 +com.alensw.PicFolder
++com.coolapk.market
 diff --git a/core/jni/abipicker/ThirdPartySO b/core/jni/abipicker/ThirdPartySO
 new file mode 100644
 index 00000000000..81cf0703124
