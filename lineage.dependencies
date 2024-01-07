@@ -1,0 +1,8 @@
+[
+  {
+    "remote": "github",
+    "repository": "cnRrex/android_external_drm",
+    "target_path": "external/drm",
+    "branch": "cm-12.1"
+  }
+]
