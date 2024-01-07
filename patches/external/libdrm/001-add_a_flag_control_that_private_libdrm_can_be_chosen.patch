@@ -15,12 +15,13 @@ diff --git a/Android.mk b/Android.mk
 index 1c6e89803..4aa734e07 100644
 --- a/Android.mk
 +++ b/Android.mk
-@@ -21,6 +21,7 @@
+@@ -21,7 +21,8 @@
  # IN THE SOFTWARE.
  #
  
 +ifneq ($(TARGET_USE_PRIVATE_LIBDRM),true)
  LOCAL_PATH := $(call my-dir)
+ LIBDRM_TOP := $(LOCAL_PATH)
  
  # Import variables LIBDRM_{,H_,INCLUDE_H_,INCLUDE_VMWGFX_H_}FILES
 @@ -69,2 +69,3 @@
