@@ -1,7 +1,7 @@
 #!/bin/sh
 
 rootdirectory="$PWD"
-dirs="system/core frameworks/base"
+dirs="system/core frameworks/base external/libdrm"
 
 
 RED='\033[0;31m'
