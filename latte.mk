@@ -21,6 +21,9 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
 $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base.mk)
 $(call inherit-product, vendor/xiaomi/latte/latte-vendor.mk)
 
+$(call inherit-product, frameworks/native/build/phone-xxhdpi-2048-dalvik-heap.mk)
+$(call inherit-product, frameworks/native/build/phone-xxhdpi-2048-hwui-memory.mk)
+
 PRODUCT_AAPT_CONFIG := normal
 PRODUCT_CHARACTERISTICS := tablet
 PRODUCT_AAPT_PREF_CONFIG := hdpi
@@ -64,14 +67,14 @@ PRODUCT_PACKAGES += \
 #     FMRadio
     
 # Dalvik
-PRODUCT_PROPERTY_OVERRIDES += \
-    dalvik.vm.heapstartsize=8m \
-    dalvik.vm.heapgrowthlimit=144m \
-    dalvik.vm.heapsize=384m \
-    dalvik.vm.heaptargetutilization=0.75 \
-    dalvik.vm.heapminfree=512k \
-    dalvik.vm.heapmaxfree=8m \
-    dalvik.vm.dex2oat-filter=speed
+# PRODUCT_PROPERTY_OVERRIDES += \
+#     dalvik.vm.heapstartsize=8m \
+#     dalvik.vm.heapgrowthlimit=144m \
+#     dalvik.vm.heapsize=384m \
+#     dalvik.vm.heaptargetutilization=0.75 \
+#     dalvik.vm.heapminfree=512k \
+#     dalvik.vm.heapmaxfree=8m \
+#     dalvik.vm.dex2oat-filter=speed
 
 # Display
 ADDITIONAL_DEFAULT_PROPERTIES += \
