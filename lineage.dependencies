@@ -4,5 +4,11 @@
     "repository": "cnRrex/android_external_drm",
     "target_path": "external/drm",
     "branch": "cm-12.1"
+  },
+  {
+    "remote": "github",
+    "repository": "CyanogenMod/android_external_libpciaccess",
+    "target_path": "external/libpciaccess",
+    "branch": "cm-12.1"
   }
 ]

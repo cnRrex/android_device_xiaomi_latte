@@ -91,6 +91,12 @@ ADDITIONAL_DEFAULT_PROPERTIES += \
 PRODUCT_PACKAGES += \
     libI420colorconvert
 
+# libdrm
+PRODUCT_PACKAGES += \
+    libdrm \
+    libdrm_intel \
+    libpciaccess
+
 # Houdini
 ADDITIONAL_BUILD_PROPERTIES += \
     ro.dalvik.vm.isa.arm=x86 \
