@@ -1,0 +1,157 @@
+From 07d2a0ce8b14dcd688798410ef49eed60e2f9a1d Mon Sep 17 00:00:00 2001
+From: Ricardo Cerqueira <ricardo@cyngn.com>
+Date: Mon, 20 Jun 2016 17:22:28 +0100
+Subject: [PATCH] Let 64bit devices ask for 32bit libraries only
+
+mediaserver is LOCAL_32_BIT_ONLY
+Why are we building this on 64? :)
+
+Change-Id: I4f3c61c28f85d7824cfb2e197f39b607e209cdec
+---
+ libavcodec/Android.mk    | 11 +++++++++++
+ libavformat/Android.mk   |  9 +++++++++
+ libavutil/Android.mk     |  8 ++++++++
+ libswresample/Android.mk | 12 ++++++++++++
+ libswscale/Android.mk    | 12 ++++++++++++
+ 5 files changed, 52 insertions(+)
+
+diff --git a/libavcodec/Android.mk b/libavcodec/Android.mk
+index 0d127ebe6f..7b55fc3f3d 100644
+--- a/libavcodec/Android.mk
++++ b/libavcodec/Android.mk
+@@ -30,8 +30,17 @@ endif
+ $(intermediates)/wmalosslessdec.o: PRIVATE_CFLAGS += $(if $(filter arm,$(TARGET_ARCH)),-Os)
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
++
++# We probably should make this a default. Mediaserver is still fully 32
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++LOCAL_32_BIT_ONLY := true
++endif
++
+ include $(BUILD_SHARED_LIBRARY)
+ 
++# We probably should make this a default. Mediaserver is still fully 32
++ifneq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++
+ include $(CLEAR_VARS)
+ FFMPEG_MULTILIB := 64
+ include $(LOCAL_PATH)/../android/build.mk
+@@ -52,4 +61,6 @@ endif
+ $(intermediates)/wmalosslessdec.o: PRIVATE_CFLAGS += $(if $(filter arm,$(TARGET_ARCH)),-Os)
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
++
+ include $(BUILD_SHARED_LIBRARY)
++endif
+diff --git a/libavformat/Android.mk b/libavformat/Android.mk
+index c74bb5d170..a665110e12 100644
+--- a/libavformat/Android.mk
++++ b/libavformat/Android.mk
+@@ -26,8 +26,15 @@ LOCAL_SHARED_LIBRARIES +=		\
+ 	libavcodec
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
++# We probably should make this a default. Mediaserver is still fully 32
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++LOCAL_32_BIT_ONLY := true
++endif
+ include $(BUILD_SHARED_LIBRARY)
+ 
++# We probably should make this a default. Mediaserver is still fully 32
++ifneq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++
+ include $(CLEAR_VARS)
+ FFMPEG_MULTILIB := 64
+ include $(LOCAL_PATH)/../android/build.mk
+@@ -44,4 +51,6 @@ LOCAL_SHARED_LIBRARIES +=		\
+ 	libavcodec
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
++
+ include $(BUILD_SHARED_LIBRARY)
++endif
+diff --git a/libavutil/Android.mk b/libavutil/Android.mk
+index 1408b3e1f7..52fbc7780c 100644
+--- a/libavutil/Android.mk
++++ b/libavutil/Android.mk
+@@ -16,8 +16,15 @@ include $(LOCAL_PATH)/../android/build.mk
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
+ 
++# We probably should make this a default. Mediaserver is still fully 32
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++LOCAL_32_BIT_ONLY := true
++endif
++
+ include $(BUILD_SHARED_LIBRARY)
+ 
++# We probably should make this a default. Mediaserver is still fully 32
++ifneq ($(BOARD_FFMPEG_32BIT_ONLY),true)
+ 
+ include $(CLEAR_VARS)
+ FFMPEG_MULTILIB := 64
+@@ -26,3 +33,4 @@ include $(LOCAL_PATH)/../android/build.mk
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
+ 
+ include $(BUILD_SHARED_LIBRARY)
++endif
+diff --git a/libswresample/Android.mk b/libswresample/Android.mk
+index 2cf73dd349..1abfbce8cc 100644
+--- a/libswresample/Android.mk
++++ b/libswresample/Android.mk
+@@ -15,12 +15,24 @@ FFMPEG_MULTILIB := 32
+ include $(LOCAL_PATH)/../android/build.mk
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
++
++# We probably should make this a default. Mediaserver is still fully 32
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++LOCAL_32_BIT_ONLY := true
++endif
++
+ include $(BUILD_SHARED_LIBRARY)
+ 
+ 
++# We probably should make this a default. Mediaserver is still fully 32
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++
+ include $(CLEAR_VARS)
+ FFMPEG_MULTILIB := 64
+ include $(LOCAL_PATH)/../android/build.mk
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
++
+ include $(BUILD_SHARED_LIBRARY)
++
++endif
+diff --git a/libswscale/Android.mk b/libswscale/Android.mk
+index 9e5db67aa9..3a13080ebd 100644
+--- a/libswscale/Android.mk
++++ b/libswscale/Android.mk
+@@ -18,8 +18,17 @@ LOCAL_SHARED_LIBRARIES += \
+ 	libavutil
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
++
++# We probably should make this a default. Mediaserver is still fully 32
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++LOCAL_32_BIT_ONLY := true
++endif
++
+ include $(BUILD_SHARED_LIBRARY)
+ 
++# We probably should make this a default. Mediaserver is still fully 32
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++
+ include $(CLEAR_VARS)
+ FFMPEG_MULTILIB := 64
+ include $(LOCAL_PATH)/../android/build.mk
+@@ -28,4 +37,7 @@ LOCAL_SHARED_LIBRARIES += \
+ 	libavutil
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
++
+ include $(BUILD_SHARED_LIBRARY)
++
++endif

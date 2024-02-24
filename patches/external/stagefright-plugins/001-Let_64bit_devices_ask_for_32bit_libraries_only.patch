@@ -1,0 +1,63 @@
+From db45c0fb502f21307a9179ac79011d11323e72b3 Mon Sep 17 00:00:00 2001
+From: Ricardo Cerqueira <ricardo@cyngn.com>
+Date: Mon, 20 Jun 2016 17:23:53 +0100
+Subject: [PATCH] Let 64bit devices ask for 32bit libraries only
+
+mediaserver is LOCAL_32_BIT_ONLY
+Why are we building this on 64? :)
+
+Change-Id: I7d2388d6463ea80093a8c9eec625e24cebd0aff9
+---
+ extractor/Android.mk | 5 +++++
+ omx/Android.mk       | 5 +++++
+ utils/Android.mk     | 5 +++++
+ 3 files changed, 15 insertions(+)
+
+diff --git a/extractor/Android.mk b/extractor/Android.mk
+index ce7cb69..4aca097 100644
+--- a/extractor/Android.mk
++++ b/extractor/Android.mk
+@@ -37,6 +37,11 @@ else
+ LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
+ endif
+ 
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
++LOCAL_32_BIT_ONLY := true
++endif
++
+ LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1 -D__STDINT_LIMITS=1
+ 
+ #ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
+diff --git a/omx/Android.mk b/omx/Android.mk
+index a3ab0e7..873b241 100644
+--- a/omx/Android.mk
++++ b/omx/Android.mk
+@@ -42,6 +42,11 @@ else
+ LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
+ endif
+ 
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
++LOCAL_32_BIT_ONLY := true
++endif
++
+ ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
+ 	LOCAL_CFLAGS += -Wno-psabi
+ endif
+diff --git a/utils/Android.mk b/utils/Android.mk
+index dd4e29d..9420b2b 100644
+--- a/utils/Android.mk
++++ b/utils/Android.mk
+@@ -34,6 +34,11 @@ else
+ LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
+ endif
+ 
++ifeq ($(BOARD_FFMPEG_32BIT_ONLY),true)
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
++LOCAL_32_BIT_ONLY := true
++endif
++
+ LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1
+ 
+ # Workaround for inline assembly tricks in FFMPEG which don't play nice with

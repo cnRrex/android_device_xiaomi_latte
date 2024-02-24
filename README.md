@@ -20,14 +20,7 @@ line 107:
 --- LOCAL_32_BIT_ONLY := true
 +++ # LOCAL_32_BIT_ONLY := true
 
-You should apply these commit to build ffmpeg 32-bit only:
-cm-13.0/external/ffmpeg/:
-https://review.lineageos.org/c/LineageOS/android_external_ffmpeg/+/60259
-github:https://github.com/LineageOS/android_external_ffmpeg/commit/07d2a0ce8b14dcd688798410ef49eed60e2f9a1d
-
-cm-13.0/external/stagefright-plugins/:
-https://review.lineageos.org/c/LineageOS/android_external_stagefright-plugins/+/61448
-github:https://github.com/LineageOS/android_external_stagefright-plugins/commit/db45c0fb502f21307a9179ac79011d11323e72b3
+# add denpendencies and apply the patches before building!
 
 Android 6.x Device configuration for Xiaomi Mi Pad 2
 =====================================
