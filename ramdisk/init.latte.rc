@@ -15,7 +15,7 @@ on charger
     write /sys/devices/pci0000\:00/0000\:00\:02.0/power/control auto
     insmod ${ro.modules.location}/videobuf-core.ko
     insmod ${ro.modules.location}/videobuf-vmalloc.ko
-    insmod ${ro.modules.location}/atomisp-css2401a0_v21.ko dypool_enable=y repool_pgnr=32768
+    insmod ${ro.modules.location}/atomisp-css2401a0_v21.ko dypool_enable=y repool_pgnr=32768 skip_fwload=1
     insmod ${ro.modules.location}/cfg80211.ko
     insmod ${ro.modules.location}/bcmdhd.ko firmware_path=/system/vendor/firmware/brcm/fw_bcmdhd_4356a2_pcie.bin nvram_path=/system/vendor/firmware/brcm/nvram_pcie_4356_a2.cal
     write /sys/devices/pci0000\:00/0000\:00\:14.0/power/control auto
@@ -529,9 +529,9 @@ on post-fs
 # Source: device/intel/mixins/groups/charger/true/init.rc
 ##############################################################
 
-service charger /charger
+service charger /sbin/chargeonlymode
     class charger
-    seclabel u:r:healthd:s0
+    seclabel u:r:chargeonlymode:s0
 
 service thermal_lite /thermal_lite
     class charger
