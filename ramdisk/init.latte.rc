@@ -529,17 +529,14 @@ on post-fs
 # Source: device/intel/mixins/groups/charger/true/init.rc
 ##############################################################
 
-service charger /sbin/chargeonlymode
+service charger /charger
     class charger
-    seclabel u:r:chargeonlymode:s0
+    seclabel u:r:healthd:s0
 
-service thermal_lite /thermal_lite
+service thermal_lite /sbin/thermal_lite
     class charger
     seclabel u:r:thermal_lite:s0
 
-service fg_algo_cos /sbin/fg_algo_cos
-  class charger
-  seclabel u:r:fg_algo_cos:s0
 ##############################################################
 # Source: device/intel/mixins/groups/disk-bus/mmc-cht/init.rc
 ##############################################################
@@ -637,6 +634,7 @@ on init
 
 on charger
    write /sys/devices/pci0000:00/0000:00:1a.0/power/control auto
+   write /sys/devices/system/cpu/cpu0/online 1
    write /sys/devices/system/cpu/cpu1/online 0
    write /sys/devices/system/cpu/cpu2/online 0
    write /sys/devices/system/cpu/cpu3/online 0
@@ -865,6 +863,15 @@ on boot
 
     # PowerHAL
     chown system system /sys/devices/system/cpu/cpufreq/interactive/touchboostpulse
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/touchboostpulse
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/touchboost_freq
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/touchboost_freq
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/touchboostpulse_duration
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/touchboostpulse_duration
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/boostpulse
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/boostpulse
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/timer_rate
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/timer_rate
 
 service post-boot-init /system/bin/busybox sh /system/etc/init.post_boot.sh
     class late_start
