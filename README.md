@@ -20,6 +20,17 @@ line 107:
 --- LOCAL_32_BIT_ONLY := true
 +++ # LOCAL_32_BIT_ONLY := true
 
+In file: cm-13.0/bootable/recovery/minui/graphic.cpp
+/*
+    if (!gr_draw) {
+        gr_backend = open_drm();
+        gr_draw = gr_backend->init(gr_backend);
+    }
+*/
+this is because drmModePageFlip has error and leads to recovery and charging mode crash
+
+these will be patch in the future
+
 # add denpendencies and apply the patches before building!
 
 Android 6.x Device configuration for Xiaomi Mi Pad 2
