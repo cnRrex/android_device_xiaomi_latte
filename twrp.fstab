@@ -4,6 +4,9 @@
 /cache         ext4  /dev/block/by-name/android_cache
 /boot          emmc  /dev/block/by-name/android_boot
 /recovery      emmc  /dev/block/by-name/android_recovery       flags=backup=1
-/misc          emmc  /dev/block/by-name/android_misc
+/misc          emmc  /dev/block/by-name/android_misc           flags=display="Misc";backup=1
+/factory       ext4  /dev/block/by-name/android_factory        flags=display="Factory"
+/config        ext4  /dev/block/by-name/android_config         flags=backup=1
 
+/external_sd   vfat  /dev/block/mmcblk1p1                      flags=display="MicroSD";storage;removable
 /usb_otg       auto  /dev/block/sda1       /dev/block/sda      flags=display="USB-OTG";storage;wipeingui;removable
