@@ -15,6 +15,8 @@
 #
 
 PRODUCT_AAPT_CONFIG := normal
+PRODUCT_CHARACTERISTICS := tablet
+PRODUCT_AAPT_PREF_CONFIG := hdpi
 
 PRODUCT_COPY_FILES += \
     device/xiaomi/latte/kernel:kernel
