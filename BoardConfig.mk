@@ -59,6 +59,7 @@ BOARD_SUPPRESS_SECURE_ERASE := true
 
 # TWRP
 RECOVERY_GRAPHICS_USE_LINELENGTH := true
+RECOVERY_GRAPHICS_FORCE_USE_LINELENGTH := true
 TW_BRIGHTNESS_PATH := /sys/class/backlight/intel_backlight/brightness
 #TW_CUSTOM_BATTERY_PATH := /sys/class/power_supply/battery/capacity
 #TW_CUSTOM_BATTERY_PATH := /sys/devices/pci0000:00/808622C1:00/i2c-0/i2c-TXN27520:00/power_supply/battery/capacity
@@ -67,3 +68,4 @@ TW_EXCLUDE_SUPERSU := true
 TW_INCLUDE_CRYPTO := true
 TW_THEME := portrait_hdpi
 TW_INCLUDE_NTFS_3G := true
+TW_NO_HAPTICS := true
