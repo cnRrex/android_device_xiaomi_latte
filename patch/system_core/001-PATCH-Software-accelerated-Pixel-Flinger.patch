@@ -133,6 +133,19 @@ index 8a427b3a8..20468cca3 100644
  
  ifneq ($(BUILD_TINY_ANDROID),true)
  # Really this should go away entirely or at least not depend on
+@@ -77,8 +98,12 @@ LOCAL_MODULE:= libpixelflinger_static
+ LOCAL_SRC_FILES := $(PIXELFLINGER_SRC_FILES)
+ LOCAL_SRC_FILES_arm := $(PIXELFLINGER_SRC_FILES_arm)
+ LOCAL_SRC_FILES_arm64 := $(PIXELFLINGER_SRC_FILES_arm64)
++LOCAL_SRC_FILES_x86 := $(PIXELFLINGER_SRC_FILES_x86)
++LOCAL_SRC_FILES_x86_64 := $(PIXELFLINGER_SRC_FILES_x86)
+ LOCAL_SRC_FILES_mips := $(PIXELFLINGER_SRC_FILES_mips)
+ LOCAL_CFLAGS := $(PIXELFLINGER_CFLAGS)
++LOCAL_WHOLE_STATIC_LIBRARIES_x86 := libenc
++LOCAL_WHOLE_STATIC_LIBRARIES_x86_64 := libenc
+ include $(BUILD_STATIC_LIBRARY)
+ 
+ 
 diff --git a/libpixelflinger/codeflinger/Android.mk b/libpixelflinger/codeflinger/Android.mk
 new file mode 100644
 index 000000000..8004af7fa

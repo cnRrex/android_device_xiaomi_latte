@@ -67,6 +67,3 @@ TW_EXCLUDE_SUPERSU := true
 TW_INCLUDE_CRYPTO := true
 TW_THEME := portrait_hdpi
 TW_INCLUDE_NTFS_3G := true
-
-# Use with patch
-TW_HAVE_X86_ACCELERATED_PIXELFLINGER := true
