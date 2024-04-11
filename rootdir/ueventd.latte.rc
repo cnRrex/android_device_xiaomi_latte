@@ -8,9 +8,11 @@
 /dev/dri/renderD128           0660   root       graphics
 /dev/sw_sync                  0660   system     system
 /dev/graphics/*               0660   root       graphics
+/dev/graphics                 0660   root       graphics
 
 # kms driver for drm based gpu
-/dev/dri/*                0666   root       graphics
+/dev/dri/*                    0666   root       graphics
+/dev/dri/card0                0666   root       graphics
 
 # jinjt add for lcd sys node»   
 /dev/lcd0                     0660   system     system
