@@ -4,7 +4,7 @@ echo $1
 rootdirectory="$PWD"
 # ---------------------------------
 
-dirs="system/core frameworks/base external/libdrm external/ffmpeg external/stagefright-plugins bootable/recovery-twrp" 
+dirs="system/core frameworks/base external/ffmpeg external/stagefright-plugins bootable/recovery-twrp bootable/recovery" 
 
 
 

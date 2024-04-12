@@ -2,13 +2,19 @@
   {
     "remote": "github",
     "repository": "cnRrex/android_external_drm",
-    "target_path": "external/drm",
+    "target_path": "external/libdrm",
     "branch": "cm-12.1"
   },
   {
     "remote": "github",
-    "repository": "CyanogenMod/android_external_libpciaccess",
+    "repository": "LineageOS/android_external_libpciaccess",
     "target_path": "external/libpciaccess",
     "branch": "cm-12.1"
+  },
+  {
+    "remote": "github",
+    "repository": "LineageOS/android_external_busybox",
+    "target_path": "external/busybox",
+    "branch": "cm-13.0"
   }
 ]
