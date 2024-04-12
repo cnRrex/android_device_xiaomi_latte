@@ -1,7 +1,7 @@
 #!/bin/sh
 
 rootdirectory="$PWD"
-dirs="system/core frameworks/base external/libdrm external/ffmpeg external/stagefright-plugins" 
+dirs="system/core frameworks/base external/libdrm external/ffmpeg external/stagefright-plugins bootable/recovery-twrp" 
 
 
 RED='\033[0;31m'
