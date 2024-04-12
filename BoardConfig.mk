@@ -116,16 +116,14 @@ TARGET_RECOVERY_PIXEL_FORMAT := "BGRA_8888"
 TARGET_USERIMAGES_USE_EXT4 := true
 COMMON_GLOBAL_CFLAGS += -DNO_SECURE_DISCARD
 BOARD_SUPPRESS_SECURE_ERASE := true
-
-RECOVERY_VARIANT := twrp
-# TWRP
-#ifeq ($(RECOVERY_VARIANT),twrp)
-
-#endif
-
-# TWRP
 RECOVERY_GRAPHICS_USE_LINELENGTH := true
 RECOVERY_GRAPHICS_FORCE_USE_LINELENGTH := true
+
+# Only when mka recoveryimage to build twrp
+#RECOVERY_VARIANT := twrp
+
+# TWRP
+ifeq ($(RECOVERY_VARIANT),twrp)
 TW_BRIGHTNESS_PATH := /sys/class/backlight/intel_backlight/brightness
 #TW_CUSTOM_BATTERY_PATH := /sys/class/power_supply/battery/capacity
 #TW_CUSTOM_BATTERY_PATH := /sys/devices/pci0000:00/808622C1:00/i2c-0/i2c-TXN27520:00/power_supply/battery/capacity
@@ -136,6 +134,8 @@ TW_THEME := portrait_hdpi
 TW_INCLUDE_NTFS_3G := true
 TW_NO_HAPTICS := true
 TW_EXTRA_LANGUAGES := true
+endif
+
 
 # Wifi
 WPA_SUPPLICANT_VERSION := VER_0_8_X
